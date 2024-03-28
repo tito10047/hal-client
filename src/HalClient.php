@@ -2,32 +2,32 @@
 
 namespace Jsor\HalClient;
 
-use function defined;
 use GuzzleHttp\Psr7 as GuzzlePsr7;
+use GuzzleHttp\Psr7\Utils;
+
 use function is_array;
-use Jsor\HalClient\HttpClient\Guzzle5HttpClient;
-use Jsor\HalClient\HttpClient\Guzzle6HttpClient;
-use Jsor\HalClient\HttpClient\Guzzle7HttpClient;
-use Jsor\HalClient\HttpClient\HttpClientInterface;
+
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\UriInterface;
 use RuntimeException;
+use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Component\HttpClient\HttplugClient;
 use Throwable;
 
 final class HalClient implements HalClientInterface
 {
-    private $httpClient;
-    private $factory;
-    private $defaultRequest;
+    private \Psr\Http\Client\ClientInterface $httpClient;
+    private Internal\HalResourceFactory $factory;
 
     private static $validContentTypes = [
         'application/hal+json',
         'application/json',
         'application/vnd.error+json',
     ];
+    private RequestInterface $defaultRequest;
 
-    public function __construct($rootUrl, HttpClientInterface $httpClient = null)
+    public function __construct($rootUrl, \Psr\Http\Client\ClientInterface $httpClient = null)
     {
         $this->httpClient = $httpClient ?: self::createDefaultHttpClient();
 
@@ -39,49 +39,34 @@ final class HalClient implements HalClientInterface
         ]);
     }
 
-    public static function getInstalledGuzzleVersion()
-    {
-        $version = 0;
-        if (defined("\GuzzleHttp\ClientInterface::VERSION")) {
-            $version = \GuzzleHttp\ClientInterface::VERSION;
-        } elseif (defined("\GuzzleHttp\ClientInterface::MAJOR_VERSION")) {
-            $version = \GuzzleHttp\ClientInterface::MAJOR_VERSION;
-        }
-
-        return $version;
-    }
-
     public function __clone()
     {
         $this->httpClient     = clone $this->httpClient;
         $this->defaultRequest = clone $this->defaultRequest;
     }
 
-    /**
-     * @return \Psr\Http\Message\UriInterface
-     */
-    public function getRootUrl()
+    public function getRootUrl(): UriInterface
     {
         return $this->defaultRequest->getUri();
     }
 
-    public function withRootUrl($rootUrl)
+    public function withRootUrl($rootUrl): HalClientInterface
     {
         $instance = clone $this;
 
         $instance->defaultRequest = $instance->defaultRequest->withUri(
-            GuzzlePsr7\uri_for($rootUrl)
+            new GuzzlePsr7\Uri($rootUrl)
         );
 
         return $instance;
     }
 
-    public function getHeader($name)
+    public function getHeader($name): array
     {
         return $this->defaultRequest->getHeader($name);
     }
 
-    public function withHeader($name, $value)
+    public function withHeader($name, $value): HalClientInterface
     {
         $instance = clone $this;
 
@@ -126,7 +111,7 @@ final class HalClient implements HalClientInterface
         $request = $this->createRequest($method, $uri, $options);
 
         try {
-            $response = $this->httpClient->send($request);
+            $response = $this->httpClient->sendRequest($request);
         } catch (Throwable $e) {
             throw Exception\HttpClientException::create($request, $e);
         }
@@ -176,16 +161,18 @@ final class HalClient implements HalClientInterface
         return $request;
     }
 
-    private function applyQuery(RequestInterface $request, $query)
+    private function applyQuery(RequestInterface $request, string|array $query)
     {
         $uri = $request->getUri();
 
         if (!is_array($query)) {
-            $query = GuzzlePsr7\parse_query($query);
+            parse_str($query, $query2);
+            $query = $query2;
         }
 
+        parse_str($uri->getQuery(), $query3);
         $newQuery = array_merge(
-            GuzzlePsr7\parse_query($uri->getQuery()),
+            $query3,
             $query
         );
 
@@ -207,7 +194,7 @@ final class HalClient implements HalClientInterface
             }
         }
 
-        return $request->withBody(GuzzlePsr7\stream_for($body));
+        return $request->withBody(Utils::streamFor($body));
     }
 
     private function handleResponse(
@@ -235,36 +222,19 @@ final class HalClient implements HalClientInterface
         );
     }
 
-    private static function createDefaultHttpClient()
+    private static function createDefaultHttpClient(): \Psr\Http\Client\ClientInterface
     {
         // @codeCoverageIgnoreStart
-        if (!interface_exists('GuzzleHttp\ClientInterface')) {
+        if (!class_exists('Symfony\Component\HttpClient\HttpClient')) {
             throw new RuntimeException(
-                'Cannot create default HttpClient because guzzlehttp/guzzle is not installed.' .
-                'Install with `composer require guzzlehttp/guzzle:"~5.0|~6.0|~7.0"`.'
+                'Cannot create default HttpClient because symfony/http-client is not installed.' .
+                'Install with `composer require symfony/http-client`.'
             );
         }
-        // @codeCoverageIgnoreEnd
-        $version = self::getInstalledGuzzleVersion();
+        $client = HttpClient::create();
+        $client = new HttplugClient($client);
 
-        switch (substr($version, 0, 1)) {
-            case '5':
-                return new Guzzle5HttpClient();
-            case '6':
-                return new Guzzle6HttpClient();
-            case '7':
-                return new Guzzle7HttpClient();
-
-            // @codeCoverageIgnoreStart
-            default:
-                throw new RuntimeException(
-                    sprintf(
-                        'Unsupported GuzzleHttp\Client version %s.',
-                        $version
-                    )
-                );
-            // @codeCoverageIgnoreEnd
-        }
+        return $client;
     }
 
     private static function resolveUri($base, $rel)

@@ -3,12 +3,11 @@
 namespace Jsor\HalClient;
 
 use GuzzleHttp\Psr7\Response;
-use Jsor\HalClient\HttpClient\HttpClientInterface;
 use Psr\Http\Message\RequestInterface;
 
-class FixtureHttpClient implements HttpClientInterface
+class FixtureHttpClient implements \Psr\Http\Client\ClientInterface
 {
-    public function send(RequestInterface $request)
+    public function sendRequest(RequestInterface $request): \Psr\Http\Message\ResponseInterface
     {
         switch ($request->getUri()->getPath()) {
             case '/documents/1':

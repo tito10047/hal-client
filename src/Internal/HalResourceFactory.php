@@ -2,9 +2,8 @@
 
 namespace Jsor\HalClient\Internal;
 
-use function array_key_exists;
-use function function_exists;
 use function in_array;
+
 use Jsor\HalClient\Exception;
 use Jsor\HalClient\HalClientInterface;
 use Jsor\HalClient\HalResource;

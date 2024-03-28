@@ -3,15 +3,15 @@
 namespace Jsor\HalClient;
 
 use function count;
+
 use GuzzleHttp\Psr7\Response;
-use Jsor\HalClient\HttpClient\HttpClientInterface;
 use Psr\Http\Message\RequestInterface;
 
-class RecordingHttpClient implements HttpClientInterface
+class RecordingHttpClient implements \Psr\Http\Client\ClientInterface
 {
     public $requests = [];
 
-    public function send(RequestInterface $request)
+    public function sendRequest(RequestInterface $request): \Psr\Http\Message\ResponseInterface
     {
         $this->requests[] = $request;
 

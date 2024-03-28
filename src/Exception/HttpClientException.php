@@ -7,7 +7,7 @@ use RuntimeException;
 
 class HttpClientException extends RuntimeException implements ExceptionInterface
 {
-    private $request;
+    private RequestInterface $request;
 
     public function __construct(
         $message,
@@ -19,7 +19,7 @@ class HttpClientException extends RuntimeException implements ExceptionInterface
         $this->request  = $request;
     }
 
-    public function getRequest()
+    public function getRequest(): RequestInterface
     {
         return $this->request;
     }
@@ -28,7 +28,7 @@ class HttpClientException extends RuntimeException implements ExceptionInterface
         RequestInterface $request,
         $previous = null,
         $message = null
-    ) {
+    ): self {
         if (!$message) {
             $message = 'Exception thrown by the http client while sending request.';
 
